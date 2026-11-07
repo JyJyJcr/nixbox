@@ -53,6 +53,22 @@ EOF
   return "$build_status"
 }
 
+nixbox_build_nss() {
+  local cache soname lib_path
+  local nss_path="$NIXBOX_DLLIB_PATH/nss"
+
+  mkdir -p "$nss_path" || return $?
+  cache="$(ldconfig -p)" || return $?
+
+  while IFS=$'\t' read -r soname lib_path; do
+    [ -e "$lib_path" ] || continue
+    ln -sfn -- "$lib_path" "$nss_path/$soname" || return $?
+  done < <(
+    printf '%s\n' "$cache" |
+      awk '$1 ~ /^libnss_/ && !seen[$1]++ { print $1 "\t" $NF }'
+  )
+}
+
 nixbox_install() {
   mkdir -p \
     "$NIXBOX_CONFIG_HOME" \
@@ -60,9 +76,9 @@ nixbox_install() {
     "$NIXBOX_STATE_HOME" \
     "$NIXBOX_CACHE_HOME" \
     "$NIXBOX_NIX_STORE" \
-    "$NIXBOX_NIX_VAR" \
-    "$NIXBOX_DLLIB_PATH/nss" || return $?
+    "$NIXBOX_NIX_VAR" || return $?
 
+  nixbox_build_nss || return $?
   nixbox_build_sandbox
 }
 
