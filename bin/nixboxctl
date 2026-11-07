@@ -20,7 +20,6 @@ APPTAINER_BIN_LIST=()
 APPTAINER_BIN_LIST+=("/usr/bin/apptainer" "/bin/apptainer")
 APPTAINER_PATH="${APPTAINER_BIN_LIST[0]}"
 
-DUMMY_EMPTY_PATH="$NIXBOX_ROOT/share/dummy_empty"
 
 NIX_STORE_OVERLAY="${NIXBOX_DATA_HOME}/nix.store"
 NIX_VAR_OVERLAY="${NIXBOX_STATE_HOME}/nix.var"
@@ -46,9 +45,10 @@ if [ "$task" = "build" ];then
   cat <<EOF > "$tmpfile"
 Bootstrap: scratch
 
-%files
-  ${DUMMY_EMPTY_PATH} /etc/passwd
-  ${DUMMY_EMPTY_PATH} /etc/group
+%setup
+  mkdir -p "\$APPTAINER_ROOTFS/etc"
+  : > "\$APPTAINER_ROOTFS/etc/passwd"
+  : > "\$APPTAINER_ROOTFS/etc/group"
 EOF
   "$APPTAINER_PATH" build "$SANDBOX_PATH" "$tmpfile"
   exit $?
