@@ -48,9 +48,6 @@ Bootstrap: scratch
 %files
   ${DUMMY_EMPTY_PATH} /etc/passwd
   ${DUMMY_EMPTY_PATH} /etc/group
-
-%environment
-  export USER=$(whoami)
 EOF
   "$APPTAINER_PATH" build "$SANDBOX_PATH" "$tmpfile"
   exit $?
