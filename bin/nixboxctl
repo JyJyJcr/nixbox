@@ -2,46 +2,41 @@
 
 # xdg
 
-XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
-XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
-XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+NIXBOX_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/nixbox"
+NIXBOX_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/nixbox"
+NIXBOX_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/nixbox"
+NIXBOX_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}/nixbox"
 
-NIXBOX_CONFIG_HOME="$XDG_CONFIG_HOME/nixbox"
-NIXBOX_DATA_HOME="$XDG_DATA_HOME/nixbox"
-NIXBOX_STATE_HOME="$XDG_STATE_HOME/nixbox"
-NIXBOX_CACHE_HOME="$XDG_CACHE_HOME/nixbox"
+# apptainer
+
+NIXBOX_APPTAINER_BIN_LIST=()
+NIXBOX_APPTAINER_BIN_LIST+=("/usr/bin/apptainer" "/bin/apptainer")
+NIXBOX_APPTAINER_PATH="${NIXBOX_APPTAINER_BIN_LIST[0]}"
 
 # config
 
 NIXBOX_ROOT="/home/jyjyjcr/opt/nixbox"
 
-APPTAINER_BIN_LIST=()
-APPTAINER_BIN_LIST+=("/usr/bin/apptainer" "/bin/apptainer")
-APPTAINER_PATH="${APPTAINER_BIN_LIST[0]}"
+NIXBOX_NIX_STORE="$NIXBOX_DATA_HOME/nix.store"
+NIXBOX_NIX_VAR="$NIXBOX_STATE_HOME/nix.var"
 
-
-NIX_STORE_OVERLAY="${NIXBOX_DATA_HOME}/nix.store"
-NIX_VAR_OVERLAY="${NIXBOX_STATE_HOME}/nix.var"
-
-SANDBOX_PATH="$NIXBOX_STATE_HOME/sandbox.sif"
+NIXBOX_SANDBOX_PATH="$NIXBOX_STATE_HOME/sandbox.sif"
 RECOVER_PATH="$NIXBOX_ROOT/lib/recover.sh"
 
 DLLIB_PATH="$NIXBOX_STATE_HOME/dllib"
 
-# guard
-if [ ! -x "$APPTAINER_PATH" ]; then
-    echo "apptainer is already overwritten by dummy file. you seems already in nixbox." >&2
-    exit 255
-fi
+check_host_apptainer() {
+  if [ ! -x "$NIXBOX_APPTAINER_PATH" ]; then
+    echo "apptainer is already hidden. you seems already in nixbox." >&2
+    return 255
+  fi
+}
 
-task="$1"
-shift
+build_sandbox() {
+  local tmpfile
+  local build_status
 
-# build
-
-if [ "$task" = "build" ];then
-  tmpfile="$(mktemp)"
+  tmpfile="$(mktemp)" || return $?
   cat <<EOF > "$tmpfile"
 Bootstrap: scratch
 
@@ -50,63 +45,90 @@ Bootstrap: scratch
   : > "\$APPTAINER_ROOTFS/etc/passwd"
   : > "\$APPTAINER_ROOTFS/etc/group"
 EOF
-  "$APPTAINER_PATH" build "$SANDBOX_PATH" "$tmpfile"
-  exit $?
-fi
+  "$NIXBOX_APPTAINER_PATH" build "$NIXBOX_SANDBOX_PATH" "$tmpfile"
+  build_status=$?
+  rm -f -- "$tmpfile"
+  return "$build_status"
+}
 
-# remove mis-inherited envs
+clear_inherited_apptainer_environment() {
+  local prefix var
 
-unset APPTAINER_APPNAME
-unset APPTAINER_BIND
-unset APPTAINER_COMMAND
-unset APPTAINER_CONTAINER
-unset APPTAINER_ENVIRONMENT
-unset APPTAINER_NAME
+  for prefix in APPTAINER_ SINGULARITY_; do
+    while IFS= read -r var; do
+      unset "$var"
+    done < <(compgen -e "$prefix")
+  done
+}
 
-unset SINGULARITY_BIND
-unset SINGULARITY_CONTAINER
-unset SINGULARITY_ENVIRONMENT
-unset SINGULARITY_NAME
+build_exec_options() {
+  options=()
+
+  for apptainer_bin in "${NIXBOX_APPTAINER_BIN_LIST[@]}"; do
+    options+=("--bind" "/dev/null:$apptainer_bin")
+  done
+
+  options+=("--no-mount" "/etc/resolv.conf")
+  options+=("--no-mount" "/etc/localtime")
+  options+=("--bind" "$NIXBOX_NIX_VAR:/nix/var")
+  options+=("--bind" "$NIXBOX_NIX_STORE:/nix/store")
+
+  for p in `find / -mindepth 1 -maxdepth 1`; do
+    case "$p" in
+      /dev|/proc|/sys|/tmp)
+        ;;
+      *)
+        options+=("--bind" "$p")
+        ;;
+    esac
+  done
+}
+
+configure_task() {
+  case "$1" in
+    login)
+      options+=("--cleanenv")
+      options+=("--env" "LANG=${LANG}")
+      options+=("--env" "LD_LIBRARY_PATH=$DLLIB_PATH/nss")
+      options+=("--env" "NIXBOX_DLLIB_ROOT=$DLLIB_PATH")
+      ;;
+    recover)
+      export NIXBOX_RECOVER_PATH="$PATH"
+      export NIXBOX_RECOVER_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
+      ;;
+    *)
+      echo "invalid command specified." >&2
+      return 1
+      ;;
+  esac
+}
+
+run_task() {
+  exec "$NIXBOX_APPTAINER_PATH" exec "${options[@]}" "$NIXBOX_SANDBOX_PATH" "$RECOVER_PATH" "$@"
+}
+
+main() {
+  local task="${1:-}"
+  shift || true
+
+  check_host_apptainer || return $?
+
+  if [ "$task" = "build" ]; then
+    build_sandbox
+    return $?
+  fi
+
+  clear_inherited_apptainer_environment
+  build_exec_options
+  configure_task "$task" || return $?
+
+  if [ $# -eq 0 ]; then
+    echo "no prompt specified." >&2
+    return 2
+  fi
+
+  run_task "$@"
+}
 
 options=()
-
-# block apptainer
-for apptainer_bin in "${APPTAINER_BIN_LIST[@]}"; do
-  options+=("--bind" "/dev/null:$apptainer_bin")
-done
-# remove annoying mounts
-options+=("--no-mount" "/etc/resolv.conf")
-options+=("--no-mount" "/etc/localtime")
-# bind nix
-options+=("--bind" "$NIX_VAR_OVERLAY:/nix/var")
-options+=("--bind" "$NIX_STORE_OVERLAY:/nix/store")
-# bind host
-for p in `find / -mindepth 1 -maxdepth 1`;do
-  case "$p" in
-    /dev|/proc|/sys|/tmp)
-    ;;
-    *)
-    options+=("--bind" "$p")
-  esac
-done
-
-if [ "$task" = login ];then
-  options+=("--cleanenv")
-  options+=("--env" "LANG=${LANG}")
-  options+=("--env" "LD_LIBRARY_PATH=$DLLIB_PATH/nss")
-  options+=("--env" "NIXBOX_DLLIB_ROOT=$DLLIB_PATH")
-elif [ "$task" = "recover" ];then
-  export NIXBOX_RECOVER_PATH="$PATH"
-  export NIXBOX_RECOVER_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"  
-else
-  echo "invalid command specified." >&2
-  exit 1
-fi
-
-
-if [ $# -eq 0 ];then
-  echo "no prompt specified." >&2
-  exit 2
-fi
-
-exec "$APPTAINER_PATH" exec "${options[@]}" "$SANDBOX_PATH" "$RECOVER_PATH" "$@"
+main "$@"
