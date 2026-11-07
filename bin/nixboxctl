@@ -35,10 +35,14 @@ nixbox_check_host_apptainer() {
 }
 
 nixbox_build_sandbox() {
-  local tmpfile
-  local build_status
+  local tmpfile tmpimage build_status
 
   tmpfile="$(mktemp)" || return $?
+  tmpimage="$(mktemp)" || {
+    build_status=$?
+    rm -f -- "$tmpfile"
+    return "$build_status"
+  }
   cat <<EOF > "$tmpfile"
 Bootstrap: scratch
 
@@ -47,9 +51,15 @@ Bootstrap: scratch
   : > "\$APPTAINER_ROOTFS/etc/passwd"
   : > "\$APPTAINER_ROOTFS/etc/group"
 EOF
-  "$NIXBOX_APPTAINER_PATH" build "$NIXBOX_SANDBOX_PATH" "$tmpfile"
+  "$NIXBOX_APPTAINER_PATH" build --force "$tmpimage" "$tmpfile"
   build_status=$?
   rm -f -- "$tmpfile"
+
+  if [ "$build_status" -eq 0 ]; then
+    mv -f -- "$tmpimage" "$NIXBOX_SANDBOX_PATH" || build_status=$?
+  fi
+
+  rm -f -- "$tmpimage"
   return "$build_status"
 }
 
