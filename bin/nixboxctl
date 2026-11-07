@@ -16,8 +16,9 @@ NIXBOX_CACHE_HOME="$XDG_CACHE_HOME/nixbox"
 
 NIXBOX_ROOT="/home/jyjyjcr/opt/nixbox"
 
-APPTAINER_PATH="/usr/bin/apptainer"
-APPTAINER_PATH_2="/bin/apptainer"
+APPTAINER_BIN_LIST=()
+APPTAINER_BIN_LIST+=("/usr/bin/apptainer" "/bin/apptainer")
+APPTAINER_PATH="${APPTAINER_BIN_LIST[0]}"
 
 DUMMY_EMPTY_PATH="$NIXBOX_ROOT/share/dummy_empty"
 
@@ -70,8 +71,9 @@ unset SINGULARITY_NAME
 options=()
 
 # block apptainer
-options+=("--bind" "$DUMMY_EMPTY_PATH:$APPTAINER_PATH")
-options+=("--bind" "$DUMMY_EMPTY_PATH:$APPTAINER_PATH_2")
+for apptainer_bin in "${APPTAINER_BIN_LIST[@]}"; do
+  options+=("--bind" "/dev/null:$apptainer_bin")
+done
 
 options+=("--no-mount" "/etc/resolv.conf")
 options+=("--no-mount" "/etc/localtime")
