@@ -13,15 +13,13 @@ NIXBOX_APPTAINER_BIN_LIST=()
 NIXBOX_APPTAINER_BIN_LIST+=("/usr/bin/apptainer" "/bin/apptainer")
 NIXBOX_APPTAINER_PATH="${NIXBOX_APPTAINER_BIN_LIST[0]}"
 
-# config
-
-NIXBOX_ROOT="/home/jyjyjcr/opt/nixbox"
+NIXBOX_SCRIPT_PATH="$0"
+NIXBOX_SCRIPT_PATH="$(readlink -f -- "$NIXBOX_SCRIPT_PATH")" || exit 255
 
 NIXBOX_NIX_STORE="$NIXBOX_DATA_HOME/nix.store"
 NIXBOX_NIX_VAR="$NIXBOX_STATE_HOME/nix.var"
 
 NIXBOX_SANDBOX_PATH="$NIXBOX_STATE_HOME/sandbox.sif"
-NIXBOX_RECOVERER_PATH="$NIXBOX_ROOT/lib/recover.sh"
 
 NIXBOX_DLLIB_PATH="$NIXBOX_STATE_HOME/dllib"
 
@@ -114,6 +112,25 @@ nixbox_add_recover_options() {
   options_ref+=("--env" "NIXBOX_RECOVER_LD_LIBRARY_PATH=$LD_LIBRARY_PATH")
 }
 
+nixbox_recover() {
+  local var new_var
+
+  if [ $# -eq 0 ]; then
+    echo "no prompt specified." >&2
+    return 2
+  fi
+
+  while IFS= read -r var; do
+    new_var="${var#NIXBOX_RECOVER_}"
+    printf -v "$new_var" '%s' "${!var}"
+    export "$new_var"
+    unset "$var"
+  done < <(compgen -e NIXBOX_RECOVER_)
+
+  unset PROMPT_COMMAND
+  exec "$@"
+}
+
 nixbox_exec() {
   local task="$1"
   local -a options=()
@@ -136,12 +153,17 @@ nixbox_exec() {
 
   nixbox_clear_apptainer_environment
 
-  exec "$NIXBOX_APPTAINER_PATH" exec "${options[@]}" "$NIXBOX_SANDBOX_PATH" "$NIXBOX_RECOVERER_PATH" "$@"
+  exec "$NIXBOX_APPTAINER_PATH" exec "${options[@]}" "$NIXBOX_SANDBOX_PATH" "$NIXBOX_SCRIPT_PATH" __recover "$@"
 }
 
 main() {
   local task="${1:-}"
   shift || true
+
+  if [ "$task" = "__recover" ]; then
+    nixbox_recover "$@"
+    return $?
+  fi
 
   nixbox_check_host_apptainer || return $?
 
