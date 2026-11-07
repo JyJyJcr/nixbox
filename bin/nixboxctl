@@ -74,13 +74,12 @@ options=()
 for apptainer_bin in "${APPTAINER_BIN_LIST[@]}"; do
   options+=("--bind" "/dev/null:$apptainer_bin")
 done
-
+# remove annoying mounts
 options+=("--no-mount" "/etc/resolv.conf")
 options+=("--no-mount" "/etc/localtime")
 # bind nix
 options+=("--bind" "$NIX_VAR_OVERLAY:/nix/var")
 options+=("--bind" "$NIX_STORE_OVERLAY:/nix/store")
-
 # bind host
 for p in `find / -mindepth 1 -maxdepth 1`;do
   case "$p" in
