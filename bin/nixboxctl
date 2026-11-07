@@ -1,0 +1,114 @@
+#!/bin/bash
+
+# xdg
+
+XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+
+NIXBOX_CONFIG_HOME="$XDG_CONFIG_HOME/nixbox"
+NIXBOX_DATA_HOME="$XDG_DATA_HOME/nixbox"
+NIXBOX_STATE_HOME="$XDG_STATE_HOME/nixbox"
+NIXBOX_CACHE_HOME="$XDG_CACHE_HOME/nixbox"
+
+# config
+
+NIXBOX_ROOT="/home/jyjyjcr/opt/nixbox"
+
+APPTAINER_PATH="/usr/bin/apptainer"
+APPTAINER_PATH_2="/bin/apptainer"
+
+DUMMY_EMPTY_PATH="$NIXBOX_ROOT/share/dummy_empty"
+
+NIX_STORE_OVERLAY="${NIXBOX_DATA_HOME}/nix.store"
+NIX_VAR_OVERLAY="${NIXBOX_STATE_HOME}/nix.var"
+
+SANDBOX_PATH="$NIXBOX_STATE_HOME/sandbox.sif"
+RECOVER_PATH="$NIXBOX_ROOT/lib/recover.sh"
+
+DLLIB_PATH="$NIXBOX_STATE_HOME/dllib"
+
+# guard
+if [ ! -x "$APPTAINER_PATH" ]; then
+    echo "apptainer is already overwritten by dummy file. you seems already in nixbox." >&2
+    exit 255
+fi
+
+task="$1"
+shift
+
+# build
+
+if [ "$task" = "build" ];then
+  tmpfile="$(mktemp)"
+  cat <<EOF > "$tmpfile"
+Bootstrap: scratch
+
+%files
+  ${DUMMY_EMPTY_PATH} /etc/passwd
+  ${DUMMY_EMPTY_PATH} /etc/group
+
+%environment
+  export USER=$(whoami)
+EOF
+  "$APPTAINER_PATH" build "$SANDBOX_PATH" "$tmpfile"
+  exit $?
+fi
+
+# remove mis-inherited envs
+
+unset APPTAINER_APPNAME
+unset APPTAINER_BIND
+unset APPTAINER_COMMAND
+unset APPTAINER_CONTAINER
+unset APPTAINER_ENVIRONMENT
+unset APPTAINER_NAME
+
+unset SINGULARITY_BIND
+unset SINGULARITY_CONTAINER
+unset SINGULARITY_ENVIRONMENT
+unset SINGULARITY_NAME
+
+options=()
+
+# block apptainer
+options+=("--bind" "$DUMMY_EMPTY_PATH:$APPTAINER_PATH")
+options+=("--bind" "$DUMMY_EMPTY_PATH:$APPTAINER_PATH_2")
+
+options+=("--no-mount" "/etc/resolv.conf")
+options+=("--no-mount" "/etc/localtime")
+# bind nix
+options+=("--bind" "$NIX_VAR_OVERLAY:/nix/var")
+options+=("--bind" "$NIX_STORE_OVERLAY:/nix/store")
+
+# bind host
+for p in `find / -mindepth 1 -maxdepth 1`;do
+  case "$p" in
+    /dev|/proc|/sys|/tmp)
+    ;;
+    *)
+    options+=("--bind" "$p")
+  esac
+done
+
+if [ "$task" = login ];then
+  options+=("--cleanenv")
+  options+=("--env" "LANG=${LANG}")
+  options+=("--env" "LD_LIBRARY_PATH=$DLLIB_PATH/nss")
+  options+=("--env" "NIXBOX_DLLIB_ROOT=$DLLIB_PATH")
+elif [ "$task" = "recover" ];then
+  export NIXBOX_RECOVER_PATH="$PATH"
+  export NIXBOX_RECOVER_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"  
+else
+  echo "invalid command specified." >&2
+  exit 1
+fi
+
+
+if [ $# -eq 0 ];then
+  echo "no prompt specified." >&2
+  exit 2
+fi
+
+exec "$APPTAINER_PATH" exec "${options[@]}" "$SANDBOX_PATH" "$RECOVER_PATH" "$@"
