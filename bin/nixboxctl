@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# self
+
+NIXBOX_SCRIPT_PATH="$0"
+NIXBOX_SCRIPT_PATH="$(readlink -f -- "$NIXBOX_SCRIPT_PATH")" || exit 255
+
 # xdg
 
 NIXBOX_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/nixbox"
@@ -7,21 +12,20 @@ NIXBOX_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/nixbox"
 NIXBOX_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/nixbox"
 NIXBOX_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}/nixbox"
 
+# config
+
+NIXBOX_NIX_STORE="$NIXBOX_DATA_HOME/nix.store"
+NIXBOX_NIX_VAR="$NIXBOX_STATE_HOME/nix.var"
+
+NIXBOX_SANDBOX_PATH="$NIXBOX_CACHE_HOME/sandbox.sif"
+
+NIXBOX_DLLIB_PATH="$NIXBOX_CONFIG_HOME/dllib"
+
 # apptainer
 
 NIXBOX_APPTAINER_BIN_LIST=()
 NIXBOX_APPTAINER_BIN_LIST+=("/usr/bin/apptainer" "/bin/apptainer")
 NIXBOX_APPTAINER_PATH="${NIXBOX_APPTAINER_BIN_LIST[0]}"
-
-NIXBOX_SCRIPT_PATH="$0"
-NIXBOX_SCRIPT_PATH="$(readlink -f -- "$NIXBOX_SCRIPT_PATH")" || exit 255
-
-NIXBOX_NIX_STORE="$NIXBOX_DATA_HOME/nix.store"
-NIXBOX_NIX_VAR="$NIXBOX_STATE_HOME/nix.var"
-
-NIXBOX_SANDBOX_PATH="$NIXBOX_STATE_HOME/sandbox.sif"
-
-NIXBOX_DLLIB_PATH="$NIXBOX_STATE_HOME/dllib"
 
 nixbox_check_host_apptainer() {
   if [ ! -x "$NIXBOX_APPTAINER_PATH" ]; then
