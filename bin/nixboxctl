@@ -143,13 +143,22 @@ nixbox_build_exec_options() {
   done
 }
 
+nixbox_add_env_relay_option() {
+  local -n target_options="$1"
+  local variable_name="$2"
+
+  if [[ -v "$variable_name" ]]; then
+    target_options+=("--env" "NIXBOX_RECOVER_${variable_name}=${!variable_name}")
+  fi
+}
+
 nixbox_add_login_options() {
   local -n options_ref="$1"
 
   options_ref+=("--cleanenv")
-  options_ref+=("--env" "NIXBOX_RECOVER_LANG=${LANG}")
-  options_ref+=("--env" "NIXBOX_RECOVER_USER=${USER}")
-  options_ref+=("--env" "NIXBOX_RECOVER_HOME=${HOME}")
+  nixbox_add_env_relay_option "$1" LANG
+  nixbox_add_env_relay_option "$1" USER
+  nixbox_add_env_relay_option "$1" HOME
   options_ref+=("--env" "LD_LIBRARY_PATH=$NIXBOX_DLLIB_PATH/nss")
   options_ref+=("--env" "NIXBOX_DLLIB_ROOT=$NIXBOX_DLLIB_PATH")
 }
@@ -157,8 +166,8 @@ nixbox_add_login_options() {
 nixbox_add_recover_options() {
   local -n options_ref="$1"
 
-  options_ref+=("--env" "NIXBOX_RECOVER_PATH=$PATH")
-  options_ref+=("--env" "NIXBOX_RECOVER_LD_LIBRARY_PATH=$LD_LIBRARY_PATH")
+  nixbox_add_env_relay_option "$1" PATH
+  nixbox_add_env_relay_option "$1" LD_LIBRARY_PATH
 }
 
 nixbox_recover() {
