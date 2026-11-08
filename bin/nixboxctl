@@ -23,13 +23,11 @@ NIXBOX_DLLIB_PATH="$NIXBOX_CONFIG_HOME/dllib"
 
 # apptainer
 
-NIXBOX_APPTAINER_BIN_LIST=()
-NIXBOX_APPTAINER_BIN_LIST+=("/usr/bin/apptainer" "/bin/apptainer")
-NIXBOX_APPTAINER_PATH="${NIXBOX_APPTAINER_BIN_LIST[0]}"
+NIXBOX_APPTAINER_PATH="/usr/bin/apptainer"
 
-nixbox_check_host_apptainer() {
-  if [ ! -x "$NIXBOX_APPTAINER_PATH" ]; then
-    echo "apptainer is already hidden. you seems already in nixbox." >&2
+nixbox_check_host_context() {
+  if [ -d /.singularity.d ]; then
+    echo "nixboxctl cannot run inside an Apptainer container." >&2
     return 255
   fi
 }
@@ -129,10 +127,6 @@ nixbox_build_exec_options() {
   local -n options_ref="$1"
   options_ref=()
 
-  for apptainer_bin in "${NIXBOX_APPTAINER_BIN_LIST[@]}"; do
-    options_ref+=("--bind" "/dev/null:$apptainer_bin")
-  done
-
   options_ref+=("--no-mount" "/etc/resolv.conf")
   options_ref+=("--no-mount" "/etc/localtime")
   options_ref+=("--bind" "$NIXBOX_NIX_VAR:/nix/var")
@@ -220,7 +214,7 @@ main() {
     return $?
   fi
 
-  nixbox_check_host_apptainer || return $?
+  nixbox_check_host_context || return $?
 
   case "$task" in
     install)
