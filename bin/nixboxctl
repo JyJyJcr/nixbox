@@ -64,19 +64,41 @@ EOF
 }
 
 nixbox_build_nss() {
-  local cache soname lib_path
+  local cache entries entry soname lib_path tmpdir
   local nss_path="$NIXBOX_DLLIB_PATH/nss"
 
-  mkdir -p "$nss_path" || return $?
   cache="$(ldconfig -p)" || return $?
+  entries="$(printf '%s\n' "$cache" | awk '$1 ~ /^libnss_/ && !seen[$1]++')"
 
-  while IFS=$'\t' read -r soname lib_path; do
+  mkdir -p "$NIXBOX_DLLIB_PATH" || return $?
+  tmpdir="$(mktemp -d "$NIXBOX_DLLIB_PATH/.nss.XXXXXX")" || return $?
+  mkdir "$tmpdir/new" || { rm -rf -- "$tmpdir"; return 1; }
+
+  while IFS= read -r entry; do
+    entry="${entry#"${entry%%[![:space:]]*}"}"
+    soname="${entry%%[[:space:]]*}"
+    lib_path="${entry#*=> }"
     [ -e "$lib_path" ] || continue
-    ln -sfn -- "$lib_path" "$nss_path/$soname" || return $?
-  done < <(
-    printf '%s\n' "$cache" |
-      awk '$1 ~ /^libnss_/ && !seen[$1]++ { print $1 "\t" $NF }'
-  )
+    ln -s -- "$lib_path" "$tmpdir/new/$soname" || { rm -rf -- "$tmpdir"; return 1; }
+  done <<< "$entries"
+
+  if [ -e "$nss_path" ] || [ -L "$nss_path" ]; then
+    mv -T -- "$nss_path" "$tmpdir/old" || { rm -rf -- "$tmpdir"; return 1; }
+  fi
+
+  if mv -T -- "$tmpdir/new" "$nss_path"; then
+    rm -rf -- "$tmpdir"
+    return $?
+  fi
+
+  if [ -e "$tmpdir/old" ] || [ -L "$tmpdir/old" ]; then
+    mv -T -- "$tmpdir/old" "$nss_path" || {
+      echo "rollback failed; previous NSS directory is at $tmpdir/old" >&2
+      return 1
+    }
+  fi
+  rm -rf -- "$tmpdir"
+  return 1
 }
 
 nixbox_install() {
@@ -86,7 +108,8 @@ nixbox_install() {
     "$NIXBOX_STATE_HOME" \
     "$NIXBOX_CACHE_HOME" \
     "$NIXBOX_NIX_STORE" \
-    "$NIXBOX_NIX_VAR" || return $?
+    "$NIXBOX_NIX_VAR" \
+    "$NIXBOX_DLLIB_PATH" || return $?
 
   nixbox_build_nss || return $?
   nixbox_build_sandbox
