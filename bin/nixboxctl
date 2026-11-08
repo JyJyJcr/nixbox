@@ -154,11 +154,18 @@ nixbox_add_env_relay_option() {
 
 nixbox_add_login_options() {
   local -n options_ref="$1"
+  local variable_name
+  local -a relay_variables=(
+    LANG USER HOME LOGNAME SHELL
+    SSH_CLIENT SSH_CONNECTION SSH_TTY TERM
+    XDG_SESSION_TYPE XDG_SESSION_CLASS XDG_SESSION_ID XDG_RUNTIME_DIR
+    DBUS_SESSION_BUS_ADDRESS
+  )
 
   options_ref+=("--cleanenv")
-  nixbox_add_env_relay_option "$1" LANG
-  nixbox_add_env_relay_option "$1" USER
-  nixbox_add_env_relay_option "$1" HOME
+  for variable_name in "${relay_variables[@]}"; do
+    nixbox_add_env_relay_option "$1" "$variable_name"
+  done
   options_ref+=("--env" "LD_LIBRARY_PATH=$NIXBOX_DLLIB_PATH/nss")
   options_ref+=("--env" "NIXBOX_DLLIB_ROOT=$NIXBOX_DLLIB_PATH")
 }
