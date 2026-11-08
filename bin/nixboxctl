@@ -23,7 +23,7 @@ NIXBOX_DLLIB_PATH="$NIXBOX_CONFIG_HOME/dllib"
 
 # apptainer
 
-NIXBOX_APPTAINER_PATH="/usr/bin/apptainer"
+NIXBOX_APPTAINER_PATH="${NIXBOX_APPTAINER_PATH:-/usr/bin/apptainer}"
 
 nixbox_check_host_context() {
   if [ -d /.singularity.d ]; then
