@@ -153,7 +153,9 @@ nixbox_add_login_options() {
   local -n options_ref="$1"
 
   options_ref+=("--cleanenv")
-  options_ref+=("--env" "LANG=${LANG}")
+  options_ref+=("--env" "NIXBOX_RECOVER_LANG=${LANG}")
+  options_ref+=("--env" "NIXBOX_RECOVER_USER=${USER}")
+  options_ref+=("--env" "NIXBOX_RECOVER_HOME=${HOME}")
   options_ref+=("--env" "LD_LIBRARY_PATH=$NIXBOX_DLLIB_PATH/nss")
   options_ref+=("--env" "NIXBOX_DLLIB_ROOT=$NIXBOX_DLLIB_PATH")
 }
