@@ -14,6 +14,7 @@ NIXBOX_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}/nixbox"
 
 # config
 
+NIXBOX_NIX="$NIXBOX_STATE_HOME/nix"
 NIXBOX_NIX_STORE="$NIXBOX_DATA_HOME/nix.store"
 NIXBOX_NIX_VAR="$NIXBOX_STATE_HOME/nix.var"
 
@@ -105,6 +106,7 @@ nixbox_install() {
     "$NIXBOX_DATA_HOME" \
     "$NIXBOX_STATE_HOME" \
     "$NIXBOX_CACHE_HOME" \
+    "$NIXBOX_NIX" \
     "$NIXBOX_NIX_STORE" \
     "$NIXBOX_NIX_VAR" \
     "$NIXBOX_DLLIB_PATH" || return $?
@@ -129,6 +131,7 @@ nixbox_build_exec_options() {
 
   options_ref+=("--no-mount" "/etc/resolv.conf")
   options_ref+=("--no-mount" "/etc/localtime")
+  options_ref+=("--bind" "$NIXBOX_NIX:/nix")
   options_ref+=("--bind" "$NIXBOX_NIX_VAR:/nix/var")
   options_ref+=("--bind" "$NIXBOX_NIX_STORE:/nix/store")
 
