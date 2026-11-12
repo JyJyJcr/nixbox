@@ -55,7 +55,8 @@ you can now use the home-manager managed user profile within the nixbox environm
     {
       home.activation.patchBashProfile = let
         homedir = lib.strings.escapeShellArg config.home.homeDirectory;
-      in lib.hm.dag.entryAfter ["writeBoundary"] ''
+      in
+      lib.hm.dag.entryAfter [ "linkGeneration" ] ''
         for rcfile in .bash_profile .bashrc .profile; do
           target=${homedir}/"$rcfile"
           managed="''${target}.hm"
