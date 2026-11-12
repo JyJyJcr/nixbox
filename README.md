@@ -102,7 +102,7 @@ you can now use the home-manager managed user profile within the nixbox environm
 
     if [[ ! -f "$HOME/.no_nixbox" && "$DENY_NIXBOX" != 1 ]] || [[ "$FORCE_NIXBOX" = 1 ]]; then
       # Enter sandbox.
-      exec "$HOME/.local/bin/nixboxctl" login "/home/jyjyjcr/.nix-profile/bin/bash" -l
+      exec "$HOME/.local/bin/nixboxctl" login "$HOME/.nix-profile/bin/bash" -l
     fi
     # use bare environment.
         
