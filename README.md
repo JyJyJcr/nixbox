@@ -87,7 +87,7 @@ you can now use the home-manager managed user profile within the nixbox environm
       home.shell.enableBashIntegration = true;
       programs.bash = {
         enable = true;
-        
+
         profileExtra = ''
           if [ -e "$HOME"/.nix-profile/etc/profile.d/nix.sh ]; then . "$HOME"/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix MANUAL install
         '';
@@ -105,7 +105,7 @@ you can now use the home-manager managed user profile within the nixbox environm
       exec "$HOME/.local/bin/nixboxctl" login "$HOME/.nix-profile/bin/bash" -l
     fi
     # use bare environment.
-        
+
     # temporary use: `ssh quetta -t "DENY_NIXBOX=1 bash -l"`
     # permanent use: `touch ~/.no_nixbox`
 
