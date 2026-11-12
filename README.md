@@ -53,6 +53,11 @@ you can now use the home-manager managed user profile within the nixbox environm
 
     ```nix
     {
+      home.file = {
+        ".bashrc".force = true;
+        ".bash_profile".force = true;
+        ".profile".force = true;
+      };
       home.activation.patchBashProfile = let
         homedir = lib.strings.escapeShellArg config.home.homeDirectory;
       in
@@ -62,14 +67,20 @@ you can now use the home-manager managed user profile within the nixbox environm
           managed="''${target}.hm"
           master="''${target}.master"
 
+          if [ ! -e "$master" ]; then
+            if [ -z "''${DRY_RUN:-}" ]; then
+              run cat > "$master" << EOF
+        if [ -f "\$HOME/$rcfile.hm" ]; then
+          . "\$HOME/$rcfile.hm"
+        elif [ -f "\$HOME/$rcfile.bare" ]; then
+          . "\$HOME/$rcfile.bare"
+        fi
+        EOF
+            fi
+          fi
+
+          run rm -rf "$managed"
           run mv "$target" "$managed"
-          run cat > "$master" << EOF 
-    if [ -f "\$HOME/$rcfile.hm" ]; then
-      . "\$HOME/$rcfile.hm"
-    elif [ -f "\$HOME/$rcfile.bare" ]; then
-      . "\$HOME/$rcfile.bare"
-    fi
-    EOF
           run ln -sfn "$master" "$target"
         done
       '';
