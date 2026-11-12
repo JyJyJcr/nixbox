@@ -53,29 +53,41 @@ you can now use the home-manager managed user profile within the nixbox environm
 
     ```nix
     {
+      home.file = {
+        ".bashrc".force = true;
+        ".bash_profile".force = true;
+        ".profile".force = true;
+      };
       home.activation.patchBashProfile = let
         homedir = lib.strings.escapeShellArg config.home.homeDirectory;
-      in lib.hm.dag.entryAfter ["writeBoundary"] ''
+      in
+      lib.hm.dag.entryAfter [ "linkGeneration" ] ''
         for rcfile in .bash_profile .bashrc .profile; do
           target=${homedir}/"$rcfile"
           managed="''${target}.hm"
           master="''${target}.master"
 
+          if [ ! -e "$master" ]; then
+            if [ -z "''${DRY_RUN:-}" ]; then
+              run cat > "$master" << EOF
+        if [ -f "\$HOME/$rcfile.hm" ]; then
+          . "\$HOME/$rcfile.hm"
+        elif [ -f "\$HOME/$rcfile.bare" ]; then
+          . "\$HOME/$rcfile.bare"
+        fi
+        EOF
+            fi
+          fi
+
+          run rm -rf "$managed"
           run mv "$target" "$managed"
-          run cat > "$master" << EOF 
-    if [ -f "\$HOME/$rcfile.hm" ]; then
-      . "\$HOME/$rcfile.hm"
-    elif [ -f "\$HOME/$rcfile.bare" ]; then
-      . "\$HOME/$rcfile.bare"
-    fi
-    EOF
           run ln -sfn "$master" "$target"
         done
       '';
       home.shell.enableBashIntegration = true;
       programs.bash = {
         enable = true;
-        
+
         profileExtra = ''
           if [ -e "$HOME"/.nix-profile/etc/profile.d/nix.sh ]; then . "$HOME"/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix MANUAL install
         '';
@@ -90,10 +102,10 @@ you can now use the home-manager managed user profile within the nixbox environm
 
     if [[ ! -f "$HOME/.no_nixbox" && "$DENY_NIXBOX" != 1 ]] || [[ "$FORCE_NIXBOX" = 1 ]]; then
       # Enter sandbox.
-      exec "$HOME/.local/bin/nixboxctl" login "/home/jyjyjcr/.nix-profile/bin/bash" -l
+      exec "$HOME/.local/bin/nixboxctl" login "$HOME/.nix-profile/bin/bash" -l
     fi
     # use bare environment.
-        
+
     # temporary use: `ssh quetta -t "DENY_NIXBOX=1 bash -l"`
     # permanent use: `touch ~/.no_nixbox`
 
